@@ -1,0 +1,38 @@
+
+- name: Test for presence of desired version of Node
+  shell: "cat '/etc/node_version' || echo ''"
+  register: current_node_version
+
+
+- name: Update APT cache
+  apt: update_cache=yes
+  when: current_node_version.stdout != '{{ node_repo }}@{{ node_tag }}' and (ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu')
+
+- name: Install Node build dependencies from apt
+  apt: 
+    pkg:   "{{ item }}"
+    state: present
+  with_items: [ build-essential ]
+  when: current_node_version.stdout != '{{ node_repo }}@{{ node_tag }}' and (ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu')
+
+
+- name: Clone the Node repo
+  git:
+    repo:    "{{ node_repo }}"
+    dest:    "{{ node_build_dir }}"
+    version: "{{ node_tag }}"
+    clone:   "yes"
+    update:  "yes"
+    force:   "yes"
+  when: current_node_version.stdout != '{{ node_repo }}@{{ node_tag }}' 
+
+- name: Build Node
+  shell: >
+    cd "{{ node_build_dir }}" &&
+    ./configure &&
+    make &&
+    make install &&
+    echo '{{ node_repo }}@{{ node_tag }}' > /etc/node_version
+  when: current_node_version.stdout != '{{ node_repo }}@{{ node_tag }}' 
+
+
